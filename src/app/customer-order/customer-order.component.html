@@ -1,0 +1,74 @@
+<ng-container *ngIf="metadata as page">
+  <div class="{{ page?.class }}">
+    <select  [name]="page?.class" [required]="page?.class"
+              (change)="onSelectChange()" class="border px-3 py-2 w-full" >
+              <option [value]="page?.class">
+                {{page?.class }}
+              </option>
+                <option [value]="123">
+                123
+              </option>
+            </select>
+    <h1 class="text-2xl font-bold mb-6">{{ page?.title }}</h1>
+    <!-- Tabs -->
+    <div class="flex ">
+      <div *ngFor="let tab of page.tabs; let i = index" class="{{ tab.class }}">
+        <button (click)="selectedTab = i" class="{{ tab.class }} cursor-pointer">
+          {{ tab.title }}
+        </button>
+      </div>
+    </div>
+    <!-- Form -->
+    <form (ngSubmit)="onSubmit()" *ngIf="page.tabs[selectedTab]?.form as form">
+      <div class="{{form.class}}">
+        <h2 class="text-xl font-semibold mb-4">{{ form.title }}</h2>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div *ngFor="let field of form.fields">
+            <label class="block font-medium mb-1">{{ field.label }}</label>
+
+            <!-- Input types -->
+            <input
+              *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'number' || field.type === 'date'"
+              [type]="field.type" [name]="field.key" [required]="field.required" [disabled]="field.disabled"
+              [min]="field.min" [max]="field.max" class="border px-3 py-2 w-full" />
+
+            <!-- Select -->
+            <select *ngIf="field.type === 'select'" [name]="field.key" [required]="field.required"
+              [disabled]="field.disabled" class="border px-3 py-2 w-full" >
+              <option *ngFor="let opt of field.options || []" [value]="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">
+          Gửi
+        </button>
+      </div>
+    </form>
+
+    <!-- Detail Table -->
+    <div *ngIf="page.tabs[selectedTab]?.detail as detail">
+      <h2 class="text-xl font-semibold mt-8 mb-4">{{ detail.title || 'Chi tiết' }}</h2>
+
+      <table class="w-full border">
+        <thead>
+          <tr>
+            <th *ngFor="let field of detail.fields" class="border px-2 py-1">
+              {{ field.label }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td *ngFor="let field of detail.fields" class="border px-2 py-1">
+              <!-- chỉ render ô trống hoặc ô nhập liệu giả lập -->
+              <input *ngIf="!field.disabled" type="text" [placeholder]="field.label" class="border px-1 py-1 w-full" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</ng-container>
