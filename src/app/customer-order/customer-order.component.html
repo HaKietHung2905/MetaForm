@@ -1,75 +1,236 @@
+<!-- Master-Detail Form Template -->
 <ng-container *ngIf="metadata as page">
-  <div class="{{ page?.class }}">
-    <!--<select  [name]="page?.class" [required]="page?.class"
-              (change)="onSelectChange()" class="border px-3 py-2 w-full" >
-              <option [value]="page?.class">
-                {{page?.class }}
-              </option>
-                <option [value]="12312312">
-                123xxxxxs
-              </option>
-      </select>
-      -->
-    <h1 class="text-2xl font-bold mb-6">{{ page?.title }}</h1>
-    <!-- Tabs -->
-    <div class="flex ">
-      <div *ngFor="let tab of page.tabs; let i = index" class="{{ tab.class }}">
-        <button (click)="selectedTab = i" class="{{ tab.class }} cursor-pointer">
+  <div class="master-detail-container">
+    
+    <!-- Header Section -->
+    <div class="form-header">
+      <h1 class="form-title">{{ page.title }}</h1>
+      <p class="form-subtitle">Quản lý thông tin khách hàng và đơn hàng</p>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-container">
+      <div class="tab-nav">
+        <div *ngFor="let tab of page.tabs; let i = index" 
+             class="tab-button"
+             [class.active]="selectedTab === i"
+             (click)="selectedTab = i">
           {{ tab.title }}
-        </button>
+        </div>
       </div>
     </div>
-    <!-- Form -->
-    <form (ngSubmit)="onSubmit()" *ngIf="page.tabs[selectedTab]?.form as form">
-      <div class="{{form.class}}">
-        <h2 class="text-xl font-semibold mb-4">{{ form.title }}</h2>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div *ngFor="let field of form.fields">
-            <label class="block font-medium mb-1">{{ field.label }}</label>
+    <!-- Master Form Section -->
+    <form (ngSubmit)="onSubmit()" *ngIf="page.tabs[selectedTab]?.form as form" class="master-form">
+      <h2 class="master-form-title">{{ form.title }}</h2>
 
-            <!-- Input types -->
+      <div class="form-grid">
+        <div *ngFor="let field of form.fields" 
+             class="form-group"
+             [class.full-width]="field.type === 'textarea'"
+             [class.half-width]="field.type !== 'textarea'">
+          
+          <label class="form-label" [class.required]="field.required">
+            {{ field.label }}
+          </label>
+
+          <!-- Text, Email, Number inputs -->
+          <input
+            *ngIf="['text', 'email', 'number'].includes(field.type)"
+            [type]="field.type"
+            [name]="field.key"
+            [required]="!!field.required"
+            [disabled]="!!field.disabled"
+            [min]="field.min"
+            [max]="field.max"
+            [placeholder]="field.placeholder"
+            class="form-input"
+            [(ngModel)]="formData[field.key]" />
+
+          <!-- Date input -->
+          <input
+            *ngIf="field.type === 'date'"
+            type="date"
+            [name]="field.key"
+            [required]="!!field.required"
+            [disabled]="!!field.disabled"
+            class="form-input"
+            [(ngModel)]="formData[field.key]" />
+
+          <!-- Textarea -->
+          <textarea
+            *ngIf="field.type === 'textarea'"
+            [name]="field.key"
+            [required]="!!field.required"
+            [disabled]="!!field.disabled"
+            [rows]="field.rows || 3"
+            [placeholder]="field.placeholder"
+            class="form-textarea"
+            [(ngModel)]="formData[field.key]">
+          </textarea>
+
+          <!-- Select dropdown -->
+          <select
+            *ngIf="field.type === 'select'"
+            [name]="field.key"
+            [required]="!!field.required"
+            [disabled]="!!field.disabled"
+            class="form-select"
+            [(ngModel)]="formData[field.key]">
+            <option value="">-- Chọn {{ field.label.toLowerCase() }} --</option>
+            <option *ngFor="let opt of field.options || []" [value]="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+
+          <!-- Lookup field with button -->
+          <div *ngIf="field.type === 'lookup'" class="form-lookup">
             <input
-              *ngIf="field.type === 'text' || field.type === 'email' || field.type === 'number' || field.type === 'date'"
-              [type]="field.type" [name]="field.key" [required]="field.required" [disabled]="field.disabled"
-              [min]="field.min" [max]="field.max" class="border px-3 py-2 w-full" />
+              type="text"
+              [name]="field.key"
+              [required]="!!field.required"
+              [disabled]="!!field.disabled"
+              [placeholder]="field.placeholder"
+              class="form-input"
+              [(ngModel)]="formData[field.key]" />
+            <button type="button" class="form-lookup-button">
+              <span>+</span>
+            </button>
+          </div>
 
-            <!-- Select -->
-            <select *ngIf="field.type === 'select'" [name]="field.key" [required]="field.required"
-              [disabled]="field.disabled" class="border px-3 py-2 w-full" >
-              <option *ngFor="let opt of field.options || []" [value]="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
+          <!-- Error message -->
+          <div *ngIf="getFieldError(field.key)" class="error-message">
+            {{ getFieldError(field.key) }}
           </div>
         </div>
-        <button type="submit" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded">
-          Gửi
-        </button>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <button type="button" class="btn-secondary">Hủy</button>
+        <button type="button" class="btn-secondary">Lưu nháp</button>
+        <button type="submit" class="btn-primary">Lưu</button>
       </div>
     </form>
 
-    <!-- Detail Table -->
-    <div *ngIf="page.tabs[selectedTab]?.detail as detail">
-      <h2 class="text-xl font-semibold mt-8 mb-4">{{ detail.title || 'Chi tiết' }}</h2>
+    <!-- Detail Section -->
+    <div *ngIf="page.tabs[selectedTab]?.detail as detail" class="detail-section">
+      
+      <!-- Detail Header -->
+      <div class="detail-header">
+        <h3 class="detail-title">{{ detail.title || 'Chi tiết đơn hàng' }}</h3>
+        <div class="detail-actions">
+          <button type="button" class="btn-add" (click)="addDetailRow()">
+            + Thêm dòng
+          </button>
+        </div>
+      </div>
 
-      <table class="w-full border">
-        <thead>
-          <tr>
-            <th *ngFor="let field of detail.fields" class="border px-2 py-1">
-              {{ field.label }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td *ngFor="let field of detail.fields" class="border px-2 py-1">
-              <!-- chỉ render ô trống hoặc ô nhập liệu giả lập -->
-              <input *ngIf="!field.disabled" type="text" [placeholder]="field.label" class="border px-1 py-1 w-full" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <!-- Detail Table -->
+      <div class="detail-table-container">
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th style="width: 40px;">#</th>
+              <th *ngFor="let field of detail.fields" 
+                  [style.width]="getColumnWidth(field.type)">
+                {{ field.label }}
+                <span *ngIf="field.required" class="text-red-500">*</span>
+              </th>
+              <th style="width: 80px;">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of detailRows; let i = index; trackBy: trackByIndex">
+              
+              <!-- Row number -->
+              <td class="text-center text-gray-500">{{ i + 1 }}</td>
+
+              <!-- Detail fields -->
+              <td *ngFor="let field of detail.fields">
+                
+                <!-- Text/Number inputs -->
+                <input
+                  *ngIf="['text', 'number'].includes(field.type)"
+                  [type]="field.type"
+                  [name]="field.key + '_' + i"
+                  [min]="field.min"
+                  [max]="field.max"
+                  [step]="field.step"
+                  class="form-input w-full"
+                  [(ngModel)]="row[field.key]"
+                  (ngModelChange)="onDetailFieldChange(i, field.key, $event)" />
+
+                <!-- Select dropdown -->
+                <select
+                  *ngIf="field.type === 'select'"
+                  [name]="field.key + '_' + i"
+                  class="form-select w-full"
+                  [(ngModel)]="row[field.key]"
+                  (ngModelChange)="onDetailFieldChange(i, field.key, $event)">
+                  <option value="">--</option>
+                  <option *ngFor="let opt of field.options || []" [value]="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+
+                <!-- Date input -->
+                <input
+                  *ngIf="field.type === 'date'"
+                  type="date"
+                  [name]="field.key + '_' + i"
+                  class="form-input w-full"
+                  [(ngModel)]="row[field.key]"
+                  (ngModelChange)="onDetailFieldChange(i, field.key, $event)" />
+
+                <!-- Readonly/calculated fields -->
+                <span
+                  *ngIf="field.disabled"
+                  class="text-right block">
+                  {{ formatValue(row[field.key], field.type) }}
+                </span>
+
+              </td>
+
+              <!-- Row actions -->
+              <td>
+                <div class="row-actions">
+                  <button type="button" class="btn-delete" (click)="removeDetailRow(i)" title="Xóa">
+                    ×
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Empty state -->
+            <tr *ngIf="detailRows.length === 0">
+              <td [attr.colspan]="detail.fields.length + 2" class="text-center text-gray-500 py-8">
+                Chưa có dữ liệu. Nhấn "Thêm dòng" để bắt đầu.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Summary Section -->
+      <div class="summary-section" *ngIf="shouldShowSummary()">
+        <div class="summary-grid">
+          <div class="summary-label">Tổng tiền hàng:</div>
+          <div class="summary-value">{{ formatCurrency(calculateSubtotal()) }}</div>
+          
+          <div class="summary-label">Tiền thuế GTGT:</div>
+          <div class="summary-value">{{ formatCurrency(calculateTax()) }}</div>
+          
+          <div class="summary-label">Tiền chiết khấu:</div>
+          <div class="summary-value">{{ formatCurrency(calculateDiscount()) }}</div>
+          
+          <div class="summary-total">
+            <div class="summary-label">Tổng tiền thanh toán:</div>
+            <div class="summary-value">{{ formatCurrency(calculateTotal()) }}</div>
+          </div>
+        </div>
+      </div>
     </div>
+
   </div>
 </ng-container>
