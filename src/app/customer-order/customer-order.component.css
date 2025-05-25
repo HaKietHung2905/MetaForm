@@ -1,16 +1,5 @@
 /* Component-specific overrides and additions */
 
-/* Customer-specific styling */
-.customer-form {
-  /* Add any customer-specific form styling here */
-}
-
-/* Order-specific styling */
-.order-form {
-  /* Add any order-specific form styling here */
-}
-
-/* Product lookup field styling */
 .product-lookup .form-lookup-button {
   background-color: #3b82f6;
   border-color: #3b82f6;

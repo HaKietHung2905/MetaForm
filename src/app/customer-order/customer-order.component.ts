@@ -90,10 +90,8 @@ export class CustomerOrderComponent implements OnInit {
   }
 
   removeDetailRow(index: number): void {
-    if (confirm('Bạn có chắc chắn muốn xóa dòng này?')) {
-      this.detailRows.splice(index, 1);
-      this.calculateDetailTotals();
-    }
+    this.detailRows.splice(index, 1);
+    this.calculateDetailTotals();
   }
 
   onDetailFieldChange(rowIndex: number, fieldKey: string, value: any): void {

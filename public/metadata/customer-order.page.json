@@ -8,9 +8,25 @@
       "form": {
         "title": "Thông tin khách hàng",
         "fields": [
-          { "key": "name", "label": "Tên", "type": "text", "required": true },
-          { "key": "email", "label": "Email", "type": "email" },
-          { "key": "phone", "label": "SĐT", "type": "text" }
+          { 
+            "key": "name", 
+            "label": "Tên", 
+            "type": "text", 
+            "required": true,
+            "placeholder": "Nhập tên khách hàng"
+          },
+          { 
+            "key": "email", 
+            "label": "Email", 
+            "type": "email",
+            "placeholder": "example@gmail.com"
+          },
+          { 
+            "key": "phone", 
+            "label": "SĐT", 
+            "type": "text",
+            "placeholder": "Nhập số điện thoại"
+          }
         ]
       }
     },
@@ -18,24 +34,60 @@
     {
       "title": "Đơn hàng",
       "class": "text-[48px] px-4 py-2 focus:outline-none",
-
       "form": {
         "title": "Thông tin đơn hàng",
         "class": "",
         "fields": [
-          { "key": "order_code", "label": "Mã đơn", "type": "text", "required": true },
-          { "key": "order_date", "label": "Ngày đặt", "type": "date" }
+          { 
+            "key": "order_code", 
+            "label": "Mã đơn", 
+            "type": "text", 
+            "required": true,
+            "placeholder": "Nhập mã đơn hàng"
+          },
+          { 
+            "key": "order_date", 
+            "label": "Ngày đặt", 
+            "type": "date",
+            "placeholder": "Chọn ngày đặt hàng"
+          }
         ]
       },
       "detail": {
         "entity": "OrderItem",
         "foreignKey": "order_code",
         "fields": [
-          { "key": "product", "label": "Sản phẩm", "type": "select", "options": [] },
-          { "key": "quantity", "label": "Số lượng", "type": "number", "min": 1 },
-          { "key": "price", "label": "Đơn giá", "type": "number" },
-          { "key": "xxx", "label": "Thành tiền", "type": "number" }
-
+          { 
+            "key": "product", 
+            "label": "Sản phẩm", 
+            "type": "select", 
+            "placeholder": "Chọn sản phẩm",
+            "options": [
+              { "label": "Sản phẩm A", "value": "product_a" },
+              { "label": "Sản phẩm B", "value": "product_b" },
+              { "label": "Sản phẩm C", "value": "product_c" }
+            ]
+          },
+          { 
+            "key": "quantity", 
+            "label": "Số lượng", 
+            "type": "number", 
+            "min": 1,
+            "placeholder": "Nhập số lượng"
+          },
+          { 
+            "key": "price", 
+            "label": "Đơn giá", 
+            "type": "number",
+            "placeholder": "Nhập đơn giá"
+          },
+          { 
+            "key": "total", 
+            "label": "Thành tiền", 
+            "type": "number",
+            "disabled": true,
+            "placeholder": "Tự động tính"
+          }
         ]
       }
     }
