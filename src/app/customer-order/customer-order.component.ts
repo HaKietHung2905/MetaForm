@@ -16,7 +16,12 @@ export class CustomerOrderComponent implements OnInit {
   selectedTab = 0;
   formData: { [key: string]: any } = {};
   detailRows: any[] = [];
+  filteredDetailRows: any[] = [];
   errors: { [key: string]: string } = {};
+  
+  // Filter-related properties
+  columnFilters: { [key: string]: string } = {};
+  filterMode: 'all' | 'any' = 'all'; // 'all' = AND logic, 'any' = OR logic
 
   constructor(private http: HttpClient) { }
 
@@ -24,6 +29,7 @@ export class CustomerOrderComponent implements OnInit {
     this.http.get<PageMetadata>('metadata/customer-order.page.json').subscribe((meta) => {
       this.metadata = meta;
       this.initializeFormData();
+      this.loadInitialDetailData();
     });
   }
 
@@ -40,8 +46,27 @@ export class CustomerOrderComponent implements OnInit {
     });
   }
 
+  loadInitialDetailData(): void {
+    const orderTab = this.metadata?.tabs.find(tab => tab.title === 'Đơn hàng');
+    
+    if (orderTab?.detail && (orderTab.detail as any).initialData) {
+      // Load the initial data from metadata JSON file
+      this.detailRows = [...(orderTab.detail as any).initialData];
+      console.log('Loaded initial detail data from metadata:', this.detailRows);
+    } else {
+      // No initial data in metadata, start with empty array
+      this.detailRows = [];
+      console.log('No initial data found in metadata, starting with empty detail rows');
+    }
+    
+    // Initialize filtered rows
+    //this.applyFilters();
+  }
+  
   onSelectChange(): void {
-    console.log('Tab selection changed');
+    console.log('Tab selection changed to:', this.selectedTab);
+    // Re-apply filters when tab changes
+    this.applyFilters();
   }
 
   onSubmit(): void {
@@ -82,38 +107,158 @@ export class CustomerOrderComponent implements OnInit {
     const currentTab = this.metadata?.tabs[this.selectedTab];
     if (currentTab?.detail) {
       const newRow: any = {};
+      
+      // Get the highest item_id and increment
+      const maxId = this.detailRows.reduce((max, row) => 
+        Math.max(max, row.item_id || 0), 0);
+      newRow.item_id = maxId + 1;
+      
       currentTab.detail.fields.forEach(field => {
         newRow[field.key] = field.default || '';
       });
+      
       this.detailRows.push(newRow);
+      this.applyFilters();
     }
   }
 
   removeDetailRow(index: number): void {
-    this.detailRows.splice(index, 1);
-    this.calculateDetailTotals();
+    // Find the actual row in detailRows based on the filtered index
+    const rowToRemove = this.filteredDetailRows[index];
+    const actualIndex = this.detailRows.findIndex(row => row === rowToRemove);
+    
+    if (actualIndex > -1) {
+      this.detailRows.splice(actualIndex, 1);
+      this.applyFilters();
+      this.calculateDetailTotals();
+    }
   }
 
   onDetailFieldChange(rowIndex: number, fieldKey: string, value: any): void {
-    this.detailRows[rowIndex][fieldKey] = value;
+    // Get the actual row from filtered results
+    const row = this.filteredDetailRows[rowIndex];
+    if (!row) return;
+    
+    row[fieldKey] = value;
     this.calculateDetailTotals();
     
     // Auto-calculate line total if quantity and price are available
     if (fieldKey === 'quantity' || fieldKey === 'price') {
-      const row = this.detailRows[rowIndex];
       if (row.quantity && row.price) {
         row.total = row.quantity * row.price;
       }
     }
+    
+    // Re-apply filters if the changed field has a filter
+    if (this.columnFilters[fieldKey]) {
+      this.applyFilters();
+    }
   }
 
-  trackByIndex(index: number, item: any): number {
-    return index;
+  trackByIndex(index: number, item: any): any {
+    return item.item_id || index;
   }
 
   private calculateDetailTotals(): void {
     // Trigger recalculation of summary totals
     // This method can be extended based on your business logic
+  }
+
+  // Filter methods
+  onFilterChange(fieldKey: string, value: string): void {
+    if (value && value.trim()) {
+      this.columnFilters[fieldKey] = value.trim();
+    } else {
+      delete this.columnFilters[fieldKey];
+    }
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    if (!this.detailRows || this.detailRows.length === 0) {
+      this.filteredDetailRows = [];
+      return;
+    }
+
+    const activeFilters = Object.keys(this.columnFilters).filter(key => 
+      this.columnFilters[key] && this.columnFilters[key].trim()
+    );
+
+    if (activeFilters.length === 0) {
+      this.filteredDetailRows = [...this.detailRows];
+      return;
+    }
+
+    this.filteredDetailRows = this.detailRows.filter(row => {
+        const matches = activeFilters.map(fieldKey => {
+        const filterValue = this.columnFilters[fieldKey].toLowerCase();
+        const rowValue = (row[fieldKey] || '').toString().toLowerCase();
+        console.log("Field data", filterValue)
+        // Different filter logic based on field type
+        const field = this.getCurrentDetailFields()?.find(f => f.key === fieldKey);
+        
+        if (field?.type === 'select') {
+          return rowValue === filterValue;
+        } else if (field?.type === 'number') {
+          // For numbers, support exact match or range (e.g., ">100", "<50", "100-200")
+          if (filterValue.startsWith('>')) {
+            const num = parseFloat(filterValue.substring(1));
+            return !isNaN(num) && parseFloat(rowValue) > num;
+          } else if (filterValue.startsWith('<')) {
+            const num = parseFloat(filterValue.substring(1));
+            return !isNaN(num) && parseFloat(rowValue) < num;
+          } else if (filterValue.includes('-')) {
+            const [min, max] = filterValue.split('-').map(v => parseFloat(v.trim()));
+            const value = parseFloat(rowValue);
+            return !isNaN(min) && !isNaN(max) && !isNaN(value) && value >= min && value <= max;
+          } else {
+            return rowValue.includes(filterValue);
+          }
+        } else {
+          // Text fields - partial match
+          return rowValue.includes(filterValue);
+        }
+      });
+
+      // Apply AND/OR logic based on filterMode
+      return this.filterMode === 'all' ? 
+        matches.every(match => match) : 
+        matches.some(match => match);
+    });
+  }
+
+  clearFilter(fieldKey: string): void {
+    delete this.columnFilters[fieldKey];
+    this.applyFilters();
+  }
+
+  clearAllFilters(): void {
+    this.columnFilters = {};
+    this.applyFilters();
+  }
+
+  hasActiveFilters(): boolean {
+    return Object.keys(this.columnFilters).some(key => 
+      this.columnFilters[key] && this.columnFilters[key].trim()
+    );
+  }
+
+  getActiveFilterCount(): number {
+    return Object.keys(this.columnFilters).filter(key => 
+      this.columnFilters[key] && this.columnFilters[key].trim()
+    ).length;
+  }
+
+  toggleFilterMode(): void {
+    this.filterMode = this.filterMode === 'all' ? 'any' : 'all';
+    this.applyFilters();
+  }
+
+  
+
+  private getCurrentDetailFields(): any[] {
+    const currentTab = this.metadata?.tabs[this.selectedTab];
+    return currentTab?.detail?.fields || [];
   }
 
   // Column width helper
@@ -155,12 +300,57 @@ export class CustomerOrderComponent implements OnInit {
     return this.calculateSubtotal() + this.calculateTax() - this.calculateDiscount();
   }
 
+  calculateTotalQuantity(): number {
+    return this.detailRows.reduce((sum, row) => {
+      return sum + (parseFloat(row.quantity) || 0);
+    }, 0);
+  }
+
+  // Filtered calculations
+  calculateFilteredSubtotal(): number {
+    return this.filteredDetailRows.reduce((sum, row) => {
+      const quantity = parseFloat(row.quantity) || 0;
+      const price = parseFloat(row.price) || 0;
+      return sum + (quantity * price);
+    }, 0);
+  }
+
+  calculateFilteredQuantity(): number {
+    return this.filteredDetailRows.reduce((sum, row) => {
+      return sum + (parseFloat(row.quantity) || 0);
+    }, 0);
+  }
+
+  calculateFilteredPercentage(): string {
+    const total = this.calculateSubtotal();
+    const filtered = this.calculateFilteredSubtotal();
+    if (total === 0) return '0';
+    return ((filtered / total) * 100).toFixed(1);
+  }
+
   // Formatting helpers
   formatValue(value: any, fieldType: string): string {
     if (!value) return '';
     
     switch (fieldType) {
       case 'number':
+        return this.formatNumber(value);
+      case 'date':
+        return this.formatDate(value);
+      default:
+        return value.toString();
+    }
+  }
+
+  formatFieldValue(row: any, field: any): string {
+    const value = row[field.key];
+    if (value === null || value === undefined || value === '') return '';
+    
+    switch (field.type) {
+      case 'number':
+        if (field.key === 'total' || field.key === 'price') {
+          return this.formatCurrency(parseFloat(value));
+        }
         return this.formatNumber(value);
       case 'date':
         return this.formatDate(value);
@@ -183,5 +373,13 @@ export class CustomerOrderComponent implements OnInit {
   formatDate(date: string): string {
     if (!date) return '';
     return new Date(date).toLocaleDateString('vi-VN');
+  }
+
+  getOptionLabel(fieldKey: string, value: string): string {
+    const field = this.getCurrentDetailFields().find(f => f.key === fieldKey);
+    if (!field || !field.options) return value;
+    
+    const option = field.options.find((opt: any) => opt.value === value);
+    return option ? option.label : value;
   }
 }

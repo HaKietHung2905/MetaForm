@@ -1,4 +1,4 @@
-<!-- Master-Detail Form Template -->
+<!-- Master-Detail Form Template with Column-Level Filtering -->
 <ng-container *ngIf="metadata as page">
   <div class="master-detail-container">
     
@@ -14,7 +14,7 @@
         <div *ngFor="let tab of page.tabs; let i = index" 
              class="tab-button"
              [class.active]="selectedTab === i"
-             (click)="selectedTab = i">
+             (click)="selectedTab = i; onSelectChange()">
           {{ tab.title }}
         </div>
       </div>
@@ -25,10 +25,7 @@
       <h2 class="master-form-title">{{ form.title }}</h2>
 
       <div class="form-grid">
-        <div *ngFor="let field of form.fields" 
-             class="form-group"
-             [class.full-width]="field.type === 'textarea'"
-             [class.half-width]="field.type !== 'textarea'">
+        <div *ngFor="let field of form.fields" class="form-group">
           
           <label class="form-label" [class.required]="field.required">
             {{ field.label }}
@@ -107,7 +104,7 @@
       </div>
 
       <!-- Form Actions -->
-       <div class="form-actions">
+      <div class="form-actions">
         <button type="button" class="btn-modern btn-danger btn-small">Hủy</button>
         <button type="button" class="btn-modern btn-secondary btn-small">Lưu nháp</button>
         <button type="submit" class="btn-modern btn-success btn-small">Lưu</button>
@@ -117,118 +114,367 @@
     <!-- Detail Section -->
     <div *ngIf="page.tabs[selectedTab]?.detail as detail" class="detail-section">
       
-      <!-- Detail Header -->
+      <!-- Detail Header with Summary Info -->
       <div class="detail-header">
-        <h3 class="detail-title">{{ detail.title || 'Chi tiết đơn hàng' }}</h3>
-        <div class="detail-actions">
-          <button type="button" class="btn-add" (click)="addDetailRow()">
+        <h3 class="detail-title">
+          {{ detail.title || 'Chi tiết đơn hàng' }}
+          <span class="text-sm text-gray-500 ml-2">
+            ({{ filteredDetailRows.length }}/{{ detailRows.length }})
+          </span>
+        </h3>
+        <div class="detail-actions flex items-center gap-2">
+          <!-- Filter Mode Toggle -->
+          <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-600">Chế độ lọc:</span>
+            <button 
+              type="button"
+              class="btn-modern btn-small"
+              [class.btn-success]="filterMode === 'all'"
+              [class.btn-secondary]="filterMode !== 'all'"
+              (click)="toggleFilterMode()"
+              title="Chế độ lọc: {{ filterMode === 'all' ? 'Tất cả điều kiện (AND)' : 'Bất kỳ điều kiện (OR)' }}">
+              {{ filterMode === 'all' ? 'Tất cả điều kiện (AND)' : 'Bất kỳ điều kiện (OR)' }}
+            </button>
+          </div>
+          
+          <!-- Clear All Filters Button -->
+          <button 
+            type="button" 
+            class="btn-modern btn-warning btn-small"
+            [disabled]="!hasActiveFilters()"
+            (click)="clearAllFilters()"
+            title="Xóa tất cả bộ lọc">
+            🗑️ Xóa bộ lọc
+            <span *ngIf="hasActiveFilters()" class="ml-1 bg-red-500 text-white rounded-full px-2 py-0.5 text-xs">
+              {{ getActiveFilterCount() }}
+            </span>
+          </button>
+          
+          <!-- Add Row Button -->
+          <button type="button" class="btn-modern btn-success btn-small" (click)="addDetailRow()">
             + Thêm dòng
           </button>
         </div>
       </div>
 
-      <!-- Detail Table -->
-      <div class="detail-table-container">
+      <!-- Detail Table with Column Filters -->
+      <div class="detail-table-container" *ngIf="detail.fields && detail.fields.length > 0; else noFieldsTemplate">
         <table class="detail-table">
           <thead>
+            <!-- Column Headers -->
             <tr>
               <th style="width: 40px;">#</th>
               <th *ngFor="let field of detail.fields" 
                   [style.width]="getColumnWidth(field.type)">
-                {{ field.label }}
-                <span *ngIf="field.required" class="text-red-500">*</span>
+                <div class="flex items-center justify-between">
+                  <span>
+                    {{ field.label }}
+                    <span *ngIf="field.required" class="text-red-500">*</span>
+                  </span>
+                  <span 
+                    *ngIf="columnFilters[field.key]" 
+                    class="ml-2 text-blue-500 text-xs"
+                    title="Đang lọc: {{ columnFilters[field.key] }}">
+                    🔍
+                  </span>
+                </div>
               </th>
               <th style="width: 80px;">Thao tác</th>
             </tr>
+            
+            <!-- Column Filters Row -->
+            <tr class="bg-gray-50">
+              <td class="p-1"></td>
+              <td *ngFor="let field of detail.fields" class="p-1">
+                <div class="relative" [hidden]="field.disabled">
+                  
+                  <!-- Text/Number Filter Input -->
+                  <input
+                    *ngIf="field.type !== 'select'"
+                    type="text"
+                    class="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                    [(ngModel)]="columnFilters[field.key]"
+                    (ngModelChange)="onFilterChange(field.key, $event)"
+                    (keydown.enter)="applyFilters()" />
+                  
+                  <!-- Select Filter Dropdown -->
+                  <select
+                    *ngIf="field.type === 'select'"
+                    class="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:border-blue-500 focus:outline-none"
+                    [(ngModel)]="columnFilters[field.key]"
+                    (ngModelChange)="onFilterChange(field.key, $event)">
+                    <option value="">-- Tất cả --</option>
+                    <option *ngFor="let opt of field.options || []" [value]="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                  
+                  <!-- Clear Filter Button -->
+                  <button
+                    *ngIf="columnFilters[field.key]"
+                    type="button"
+                    class="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-red-500 transition-colors text-xs"
+                    (click)="clearFilter(field.key)"
+                    title="Xóa bộ lọc">
+                    ×
+                  </button>
+                </div>
+                
+              
+              </td>
+              <td class="p-1"></td>
+            </tr>
           </thead>
+          
           <tbody>
-            <tr *ngFor="let row of detailRows; let i = index; trackBy: trackByIndex">
+            <!-- Data Rows -->
+            <tr *ngFor="let row of filteredDetailRows; let i = index; trackBy: trackByIndex"
+                class="hover:bg-blue-50">
               
               <!-- Row number -->
-              <td class="text-center text-gray-500">{{ i + 1 }}</td>
+              <td class="text-center text-gray-500">{{ row.item_id || (i + 1) }}</td>
 
               <!-- Detail fields -->
               <td *ngFor="let field of detail.fields">
                 
                 <!-- Text/Number inputs -->
                 <input
-                  *ngIf="['text', 'number'].includes(field.type)"
+                  *ngIf="['text', 'number'].includes(field.type) && !field.disabled"
                   [type]="field.type"
-                  [name]="field.key + '_' + i"
+                  [name]="field.key"
                   [min]="field.min"
                   [max]="field.max"
                   [step]="field.step"
-                  [placeholder]="field.placeholder || field.label"
-                  class="form-input w-full"
+                  class="form-input w-full text-sm"
                   [(ngModel)]="row[field.key]"
                   (ngModelChange)="onDetailFieldChange(i, field.key, $event)" />
 
                 <!-- Select dropdown -->
-                <select
-                  *ngIf="field.type === 'select'"
+                <!--<select
+                  *ngIf="field.type === 'select' && !field.disabled"
                   [name]="field.key + '_' + i"
-                  class="form-select w-full"
+                  class="form-select w-full text-sm"
                   [(ngModel)]="row[field.key]"
                   (ngModelChange)="onDetailFieldChange(i, field.key, $event)">
                   <option value="">--</option>
                   <option *ngFor="let opt of field.options || []" [value]="opt.value">
                     {{ opt.label }}
                   </option>
-                </select>
+                </select>-->
 
                 <!-- Date input -->
-                <input
-                  *ngIf="field.type === 'date'"
+                <!--<input
+                  *ngIf="field.type === 'date' && !field.disabled"
                   type="date"
                   [name]="field.key + '_' + i"
-                  class="form-input w-full"
+                  class="form-input w-full text-sm"
                   [(ngModel)]="row[field.key]"
                   (ngModelChange)="onDetailFieldChange(i, field.key, $event)" />
-
-                <!-- Readonly/calculated fields -->
+              -->
+                <!-- Readonly/calculated fields (non-select) -->
                 <span
-                  *ngIf="field.disabled"
-                  class="text-right block">
-                  {{ formatValue(row[field.key], field.type) }}
+                  *ngIf="field.disabled && field.type !== 'select'"
+                  class="text-right block font-medium text-sm"
+                  [ngClass]="{'text-green-600 font-bold': field.key === 'total'}">
+                  {{ formatFieldValue(row, field) }}
                 </span>
+
+                <!-- Display select fields (like product) -->
+                <div
+                  *ngIf="field.type === 'select'"
+                  class="text-sm">
+                  
+                  
+                  <!-- Regular select field display -->
+                  <span *ngIf="field.key !== 'product'">
+                    {{ getOptionLabel(field.key, row[field.key]) }}
+                  </span>
+                </div>
 
               </td>
 
               <!-- Row actions -->
               <td>
                 <div class="row-actions">
-                  <button type="button" class="btn-modern btn-danger btn-small btn-icon" (click)="removeDetailRow(i)" title="Xóa">
+                  <button type="button" 
+                          class="btn-modern btn-danger btn-small" 
+                          (click)="removeDetailRow(i)" 
+                          title="Xóa">
                     ×
                   </button>
                 </div>
               </td>
             </tr>
 
-            <!-- Empty state -->
-            <tr *ngIf="detailRows.length === 0">
+            <!-- Empty state - original data is empty -->
+            <tr *ngIf="filteredDetailRows.length === 0 && detailRows.length === 0">
               <td [attr.colspan]="detail.fields.length + 2" class="text-center text-gray-500 py-8">
                 Chưa có dữ liệu. Nhấn "Thêm dòng" để bắt đầu.
+              </td>
+            </tr>
+
+            <!-- No results after filtering -->
+            <tr *ngIf="filteredDetailRows.length === 0 && detailRows.length > 0">
+              <td [attr.colspan]="detail.fields.length + 2" class="text-center text-yellow-600 py-8">
+                <div class="flex flex-col items-center gap-2">
+                  <span>Không tìm thấy kết quả phù hợp với bộ lọc.</span>
+                  <button 
+                    type="button" 
+                    class="btn-modern btn-warning btn-small"
+                    (click)="clearAllFilters()">
+                    🗑️ Xóa tất cả bộ lọc
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Summary Section -->
+      <!-- No Fields Template -->
+      <ng-template #noFieldsTemplate>
+        <div class="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+          <p class="text-gray-600 mb-4">Không tìm thấy định nghĩa trường dữ liệu.</p>
+          <button 
+            type="button" 
+            class="btn-modern btn-primary btn-small"
+            (click)="loadInitialDetailData()">
+            🔄 Tải lại dữ liệu
+          </button>
+        </div>
+      </ng-template>
+
+      <!-- Summary Section with Enhanced Calculations -->
       <div class="summary-section" *ngIf="shouldShowSummary()">
-        <div class="summary-grid">
+        <!-- Filter Status Info -->
+        <div *ngIf="hasActiveFilters()" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-blue-700 font-medium">🔍 Đang áp dụng bộ lọc:</span>
+              <span class="text-blue-600">{{ getActiveFilterCount() }} điều kiện</span>
+              <span class="text-sm text-blue-600">({{ filterMode === 'all' ? 'Tất cả' : 'Bất kỳ' }})</span>
+            </div>
+            <button 
+              type="button" 
+              class="btn-modern btn-warning btn-small"
+              (click)="clearAllFilters()">
+              Xóa bộ lọc
+            </button>
+          </div>
+          
+          <!-- Active filters display -->
+          <div class="mt-2 flex flex-wrap gap-2">
+            <span *ngFor="let field of detail.fields" 
+                  class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
+                  [hidden]="!columnFilters[field.key]">
+              <strong>{{ field.label }}:</strong>
+              <span>{{ columnFilters[field.key] }}</span>
+              <button 
+                type="button" 
+                class="ml-1 text-blue-500 hover:text-red-500"
+                (click)="clearFilter(field.key)">
+                ×
+              </button>
+            </span>
+          </div>
+        </div>
+
+        <!-- Total Summary (All Data) -->
+        <div class="summary-grid mb-4">
+          <div class="text-lg font-semibold text-gray-800 col-span-2 mb-2 border-b border-gray-300 pb-2">
+            📊 Tổng kết tất cả dữ liệu ({{ detailRows.length }} dòng)
+          </div>
+          
+          <div class="summary-label">Số mặt hàng:</div>
+          <div class="summary-value">{{ detailRows.length }} sản phẩm</div>
+          
+          <div class="summary-label">Tổng số lượng:</div>
+          <div class="summary-value">{{ formatNumber(calculateTotalQuantity()) }}</div>
+          
           <div class="summary-label">Tổng tiền hàng:</div>
           <div class="summary-value">{{ formatCurrency(calculateSubtotal()) }}</div>
-          
-          <div class="summary-label">Tiền thuế GTGT:</div>
-          <div class="summary-value">{{ formatCurrency(calculateTax()) }}</div>
           
           <div class="summary-label">Tiền chiết khấu:</div>
           <div class="summary-value">{{ formatCurrency(calculateDiscount()) }}</div>
           
+          <div class="summary-label">Tiền thuế GTGT (10%):</div>
+          <div class="summary-value">{{ formatCurrency(calculateTax()) }}</div>
+          
+          <div class="summary-label">Phí vận chuyển:</div>
+          <div class="summary-value">{{ formatCurrency(formData['shipping_fee'] || 0) }}</div>
+          
           <div class="summary-total">
             <div class="summary-label">Tổng tiền thanh toán:</div>
             <div class="summary-value">{{ formatCurrency(calculateTotal()) }}</div>
+          </div>
+        </div>
+
+        <!-- Filtered Summary (if filters are active) -->
+        <div *ngIf="hasActiveFilters() && filteredDetailRows.length > 0" 
+             class="summary-grid border-t-2 border-blue-200 pt-4 bg-blue-50 rounded-lg p-4">
+          <div class="text-lg font-semibold text-blue-800 col-span-2 mb-2 border-b border-blue-300 pb-2">
+            🔍 Tổng kết dữ liệu đã lọc ({{ filteredDetailRows.length }} dòng)
+          </div>
+          
+          <div class="summary-label text-blue-700">Số mặt hàng đã lọc:</div>
+          <div class="summary-value text-blue-800">{{ filteredDetailRows.length }} sản phẩm</div>
+          
+          <div class="summary-label text-blue-700">Tổng SL đã lọc:</div>
+          <div class="summary-value text-blue-800">{{ formatNumber(calculateFilteredQuantity()) }}</div>
+          
+          <div class="summary-label text-blue-700">Tổng tiền hàng đã lọc:</div>
+          <div class="summary-value text-blue-800">{{ formatCurrency(calculateFilteredSubtotal()) }}</div>
+          
+          <div class="summary-total border-blue-300">
+            <div class="summary-label text-blue-700">Tỷ lệ so với tổng:</div>
+            <div class="summary-value text-blue-800">{{ calculateFilteredPercentage() }}%</div>
+          </div>
+          
+          <!-- Comparison indicators -->
+          <div class="col-span-2 mt-3 pt-3 border-t border-blue-300">
+            <div class="grid grid-cols-3 gap-4 text-sm">
+              <div class="text-center">
+                <div class="text-blue-600 font-medium">Số lượng</div>
+                <div class="text-blue-800 font-bold">
+                  {{ formatNumber(calculateFilteredQuantity()) }} / {{ formatNumber(calculateTotalQuantity()) }}
+                </div>
+              </div>
+              <div class="text-center">
+                <div class="text-blue-600 font-medium">Giá trị</div>
+                <div class="text-blue-800 font-bold">
+                  {{ calculateFilteredPercentage() }}%
+                </div>
+              </div>
+              <div class="text-center">
+                <div class="text-blue-600 font-medium">Dòng dữ liệu</div>
+                <div class="text-blue-800 font-bold">
+                  {{ filteredDetailRows.length }} / {{ detailRows.length }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty filter result notice -->
+        <div *ngIf="hasActiveFilters() && filteredDetailRows.length === 0" 
+             class="summary-grid border-t-2 border-yellow-200 pt-4 bg-yellow-50 rounded-lg p-4">
+          <div class="col-span-2 text-center text-yellow-700">
+            <div class="text-lg font-semibold mb-2">⚠️ Không có dữ liệu phù hợp</div>
+            <p class="text-sm mb-3">Bộ lọc hiện tại không tìm thấy kết quả nào. Hãy thử:</p>
+            <div class="flex flex-wrap justify-center gap-2">
+              <button 
+                type="button" 
+                class="btn-modern btn-warning btn-small"
+                (click)="clearAllFilters()">
+                🗑️ Xóa tất cả bộ lọc
+              </button>
+              <button 
+                type="button" 
+                class="btn-modern btn-secondary btn-small"
+                (click)="toggleFilterMode()">
+                🔄 Đổi chế độ lọc ({{ filterMode === 'all' ? 'OR' : 'AND' }})
+              </button>
+            </div>
           </div>
         </div>
       </div>

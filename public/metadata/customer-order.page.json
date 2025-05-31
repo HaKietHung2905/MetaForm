@@ -50,23 +50,30 @@
             "label": "Ngày đặt", 
             "type": "date",
             "placeholder": "Chọn ngày đặt hàng"
+          },
+          {
+            "key": "shipping_fee",
+            "label": "Phí vận chuyển",
+            "type": "number",
+            "default": 50000,
+            "placeholder": "Nhập phí vận chuyển"
           }
         ]
       },
       "detail": {
+        "title": "Chi tiết đơn hàng",
         "entity": "OrderItem",
         "foreignKey": "order_code",
         "fields": [
           { 
+            "key": "product_code", 
+            "label": "Mã sản phẩm",
+            "type": "text"
+          },
+          { 
             "key": "product", 
-            "label": "Sản phẩm", 
-            "type": "select", 
-            "placeholder": "Chọn sản phẩm",
-            "options": [
-              { "label": "Sản phẩm A", "value": "product_a" },
-              { "label": "Sản phẩm B", "value": "product_b" },
-              { "label": "Sản phẩm C", "value": "product_c" }
-            ]
+            "label": "Sản phẩm",
+            "type": "text"
           },
           { 
             "key": "quantity", 
@@ -87,6 +94,53 @@
             "type": "number",
             "disabled": true,
             "placeholder": "Tự động tính"
+          }
+        ],
+        "initialData": [
+          {
+            "item_id": 1,
+            "product_code": "SP001",
+            "product": "laptop_dell",
+            "quantity": 2,
+            "price": 25000000,
+            "total": 50000000,
+            "note_item": "Laptop Dell XPS 13 - Intel Core i7"
+          },
+          {
+            "item_id": 2,
+            "product_code": "SP0011",
+            "product": "iphone_15",
+            "quantity": 1,
+            "price": 35000000,
+            "total": 35000000,
+            "note_item": "iPhone 15 Pro Max 256GB - Natural Titanium"
+          },
+          {
+            "item_id": 3,
+            "product_code": "SP003",
+            "product": "samsung_s24",
+            "quantity": 3,
+            "price": 22000000,
+            "total": 66000000,
+            "note_item": "Samsung Galaxy S24 Ultra 512GB"
+          },
+          {
+            "item_id": 4,
+            "product_code": "SP004",
+            "product": "macbook_pro",
+            "quantity": 1,
+            "price": 55000000,
+            "total": 55000000,
+            "note_item": "MacBook Pro 14-inch M3 Pro 18GB RAM"
+          },
+          {
+            "item_id": 5,
+            "product_code": "SP005",
+            "product": "airpods_pro",
+            "quantity": 5,
+            "price": 6500000,
+            "total": 32500000,
+            "note_item": "AirPods Pro 2nd Generation với MagSafe"
           }
         ]
       }
