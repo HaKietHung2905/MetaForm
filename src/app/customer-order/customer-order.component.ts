@@ -35,7 +35,7 @@ export class CustomerOrderComponent implements OnInit {
 
   private initializeFormData(): void {
     if (!this.metadata) return;
-    
+    console.log('Metadata', this)
     // Initialize form data with default values
     this.metadata.tabs.forEach(tab => {
       if (tab.form) {
@@ -43,7 +43,9 @@ export class CustomerOrderComponent implements OnInit {
           this.formData[field.key] = field.default || '';
         });
       }
+      
     });
+   
   }
 
   loadInitialDetailData(): void {
