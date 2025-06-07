@@ -23,7 +23,16 @@
         </div>
       </div>
     </div>
-
+    <app-advanced-filter
+      [data]="detailRows"
+      [fields]="filterFields"
+      [autoApply]="true"
+      [showStats]="true"
+      [showExport]="true"
+      (filtersApplied)="onFiltersApplied($event)"
+      
+      >
+    </app-advanced-filter>
     <!-- Data Table Section -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200">
       <!-- Table Container -->

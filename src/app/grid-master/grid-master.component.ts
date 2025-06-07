@@ -6,14 +6,26 @@ import { RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { PageMetadata } from '../models';
 
+// Import the Advanced Filter Component and Types
+// In your grid-master.component.ts
+import { 
+  AdvancedFilterComponent,
+  type FilterField,
+  type FilterResult
+} from '../shared/advanced-filter/advanced-filter.component';
+
 @Component({
   selector: 'app-grid-master',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, AdvancedFilterComponent],
   templateUrl: './grid-master.component.html',
   styleUrls: ['./grid-master.component.css']
 })
 export class GridMaster implements OnInit {
+  // Add these new properties
+  filterFields: FilterField[] = [];
+  activeFilterCount: number = 0;
+  
   metadata?: PageMetadata;
   selectedTab = 0;
   labelData: {[key: string]: any} = {};
@@ -42,7 +54,27 @@ export class GridMaster implements OnInit {
       }
     });
   }
- 
+
+  onFiltersApplied(result: FilterResult): void {
+    this.filteredDetailRows = result.filteredData;
+    this.activeFilterCount = result.activeFilterCount;
+  }
+  
+  //onExportRequested(data: any[]): void {
+    // Simple CSV export
+    //console.log('Exporting data:', data);
+  //}
+
+  private setupFilterFields(): void {
+    this.filterFields = this.detailFields.map(field => ({
+      key: field.key,
+      label: field.label || field.key,
+      type: field.type === 'number' ? 'number' : 
+            field.type === 'select' ? 'select' : 'text',
+      options: field.options
+    }));
+  }
+  
   private initializeFormData(): void {
     if (!this.metadata) return;
     
