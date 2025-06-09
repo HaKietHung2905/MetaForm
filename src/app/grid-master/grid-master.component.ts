@@ -1,4 +1,3 @@
-
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,7 +6,6 @@ import { HttpClient } from '@angular/common/http';
 import { PageMetadata } from '../models';
 
 // Import the Advanced Filter Component and Types
-// In your grid-master.component.ts
 import { 
   AdvancedFilterComponent,
   type FilterField,
@@ -48,6 +46,8 @@ export class GridMaster implements OnInit {
         this.metadata = meta;
         this.initializeFormData();
         this.loadInitialDetailData();
+        // Setup filter fields after data is loaded
+        this.setupFilterFields();
       },
       error: (error) => {
         console.error('Error loading grid metadata:', error);
@@ -56,23 +56,83 @@ export class GridMaster implements OnInit {
   }
 
   onFiltersApplied(result: FilterResult): void {
+    console.log('Filters applied, result:', result);
     this.filteredDetailRows = result.filteredData;
     this.activeFilterCount = result.activeFilterCount;
   }
   
-  //onExportRequested(data: any[]): void {
+  onExportRequested(data: any[]): void {
     // Simple CSV export
-    //console.log('Exporting data:', data);
-  //}
+    console.log('Exporting data:', data);
+    this.exportToCSV(data, 'inventory-data.csv');
+  }
+
+  private exportToCSV(data: any[], filename: string): void {
+    if (data.length === 0) return;
+    
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          if (value === null || value === undefined) return '';
+          const stringValue = String(value);
+          return stringValue.includes(',') || stringValue.includes('"') 
+            ? `"${stringValue.replace(/"/g, '""')}"` 
+            : stringValue;
+        }).join(',')
+      )
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  }
 
   private setupFilterFields(): void {
-    this.filterFields = this.detailFields.map(field => ({
-      key: field.key,
-      label: field.label || field.key,
-      type: field.type === 'number' ? 'number' : 
-            field.type === 'select' ? 'select' : 'text',
-      options: field.options
-    }));
+    console.log('Setting up filter fields with detailFields:', this.detailFields);
+    
+    this.filterFields = this.detailFields.map(field => {
+      const filterField: FilterField = {
+        key: field.key,
+        label: field.label || field.key,
+        type: this.mapFieldTypeToFilterType(field.type),
+        options: field.options || [],
+        placeholder: field.placeholder,
+        required: field.required || false
+      };
+      
+      console.log(`Mapped field ${field.key}:`, filterField);
+      return filterField;
+    });
+    
+    console.log('Final filterFields:', this.filterFields);
+  }
+
+  private mapFieldTypeToFilterType(fieldType: string): 'text' | 'number' | 'select' | 'date' | 'boolean' {
+    switch (fieldType) {
+      case 'number':
+        return 'number';
+      case 'select':
+        return 'select';
+      case 'date':
+        return 'date';
+      case 'boolean':
+        return 'boolean';
+      default:
+        return 'text';
+    }
   }
   
   private initializeFormData(): void {
@@ -112,6 +172,9 @@ export class GridMaster implements OnInit {
     if (currentTab?.detail && (currentTab.detail as any).initialData) {
       // Load the initial data from metadata JSON file
       this.detailRows = [...(currentTab.detail as any).initialData];
+      // Initialize filtered rows to show all data initially
+      this.filteredDetailRows = [...this.detailRows];
+      
       console.log('Loaded initial detail data from metadata:', this.detailRows);
       
       // Verify that labels are loaded correctly
@@ -122,6 +185,7 @@ export class GridMaster implements OnInit {
     } else {
       // No initial data in metadata, start with empty array
       this.detailRows = [];
+      this.filteredDetailRows = [];
       console.log('No initial data found in metadata, starting with empty detail rows');
     }
     
@@ -144,8 +208,6 @@ export class GridMaster implements OnInit {
     this.applyFilters();
   }
 
-  
-
   private validateForm(): void {
     this.errors = {};
     const currentTab = this.metadata?.tabs[this.selectedTab];
@@ -157,8 +219,6 @@ export class GridMaster implements OnInit {
         }
       });
     }
-
-   
   }
 
   getFieldError(fieldKey: string): string | null {
@@ -202,7 +262,6 @@ export class GridMaster implements OnInit {
     if (actualIndex > -1) {
       if (confirm(`Bạn có chắc chắn muốn xóa mặt hàng "${rowToRemove.item_name}"?`)) {
         this.detailRows.splice(actualIndex, 1);
-      
         this.applyFilters();
       }
     }
@@ -420,37 +479,6 @@ export class GridMaster implements OnInit {
     return ((filtered / total) * 100).toFixed(1);
   }
 
-  // Inventory-specific methods
-  getLowStockItems(): any[] {
-    return this.detailRows.filter(row => {
-      const quantity = parseFloat(row.quantity) || 0;
-      const minStock = parseFloat(row.min_stock) || 0;
-      return minStock > 0 && quantity <= minStock && quantity > 0;
-    });
-  }
-
-  getExpiringItems(): any[] {
-    const today = new Date();
-    const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
-    
-    return this.detailRows.filter(row => {
-      if (!row.expiry_date) return false;
-      const expiryDate = new Date(row.expiry_date);
-      return expiryDate <= thirtyDaysFromNow && expiryDate >= today;
-    });
-  }
-
-  getItemsByCategory(): { [key: string]: any[] } {
-    return this.detailRows.reduce((acc, row) => {
-      const category = row.category || 'uncategorized';
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(row);
-      return acc;
-    }, {});
-  }
-
   // Formatting helpers (reusing from customer-order pattern)
   formatValue(value: any, fieldType: string): string {
     if (!value) return '';
@@ -516,156 +544,4 @@ export class GridMaster implements OnInit {
     };
     return statusClasses[status] || 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800';
   }
-
-  // Advanced inventory analytics methods
-  getInventoryHealth(): { healthy: number; warning: number; critical: number } {
-    let healthy = 0;
-    let warning = 0;
-    let critical = 0;
-
-    this.detailRows.forEach(row => {
-      const quantity = parseFloat(row.quantity) || 0;
-      const minStock = parseFloat(row.min_stock) || 0;
-      
-      if (quantity <= 0) {
-        critical++;
-      } else if (minStock > 0 && quantity <= minStock) {
-        warning++;
-      } else {
-        healthy++;
-      }
-    });
-
-    return { healthy, warning, critical };
-  }
-
-  getTopValueItems(count: number = 5): any[] {
-    return [...this.detailRows]
-      .sort((a, b) => (b.total_value || 0) - (a.total_value || 0))
-      .slice(0, count);
-  }
-
-  getCategoryValueBreakdown(): { [key: string]: number } {
-    return this.detailRows.reduce((acc, row) => {
-      const category = row.category || 'uncategorized';
-      const value = parseFloat(row.total_value) || 0;
-      acc[category] = (acc[category] || 0) + value;
-      return acc;
-    }, {} as { [key: string]: number });
-  }
-
-  getSupplierBreakdown(): { [key: string]: { count: number; value: number } } {
-    return this.detailRows.reduce((acc, row) => {
-      const supplier = row.supplier || 'Không xác định';
-      const value = parseFloat(row.total_value) || 0;
-      
-      if (!acc[supplier]) {
-        acc[supplier] = { count: 0, value: 0 };
-      }
-      
-      acc[supplier].count++;
-      acc[supplier].value += value;
-      return acc;
-    }, {} as { [key: string]: { count: number; value: number } });
-  }
-
- 
-
-  
-
-  // Bulk operations
-  bulkUpdateStatus(newStatus: string, selectedRows?: any[]): void {
-    const rowsToUpdate = selectedRows || this.filteredDetailRows;
-    
-    if (rowsToUpdate.length === 0) {
-      alert('Không có dòng nào được chọn để cập nhật.');
-      return;
-    }
-
-    if (confirm(`Bạn có chắc chắn muốn cập nhật trạng thái cho ${rowsToUpdate.length} mặt hàng?`)) {
-      rowsToUpdate.forEach(row => {
-        row.status = newStatus;
-      });
-     
-      alert(`Đã cập nhật trạng thái cho ${rowsToUpdate.length} mặt hàng.`);
-    }
-  }
-
-  bulkAdjustPrices(adjustmentType: 'percentage' | 'fixed', adjustmentValue: number, selectedRows?: any[]): void {
-    const rowsToUpdate = selectedRows || this.filteredDetailRows;
-    
-    if (rowsToUpdate.length === 0) {
-      alert('Không có dòng nào được chọn để điều chỉnh giá.');
-      return;
-    }
-
-    if (confirm(`Bạn có chắc chắn muốn điều chỉnh giá cho ${rowsToUpdate.length} mặt hàng?`)) {
-      rowsToUpdate.forEach(row => {
-        const currentPrice = parseFloat(row.unit_price) || 0;
-        
-        if (adjustmentType === 'percentage') {
-          row.unit_price = currentPrice * (1 + adjustmentValue / 100);
-        } else {
-          row.unit_price = currentPrice + adjustmentValue;
-        }
-        
-        // Recalculate total value
-        row.total_value = (parseFloat(row.quantity) || 0) * row.unit_price;
-      });
-    
-      alert(`Đã điều chỉnh giá cho ${rowsToUpdate.length} mặt hàng.`);
-    }
-  }
-
-  // Search and Quick Actions
-  quickSearch(searchTerm: string): void {
-    if (!searchTerm || !searchTerm.trim()) {
-      this.clearAllFilters();
-      return;
-    }
-
-    // Clear existing filters and apply global search
-    this.columnFilters = {};
-    
-    // Search across multiple fields
-    this.filteredDetailRows = this.detailRows.filter(row => {
-      const searchValue = searchTerm.toLowerCase();
-      return (
-        (row.item_code || '').toLowerCase().includes(searchValue) ||
-        (row.item_name || '').toLowerCase().includes(searchValue) ||
-        (row.supplier || '').toLowerCase().includes(searchValue) ||
-        (row.location_in_warehouse || '').toLowerCase().includes(searchValue)
-      );
-    });
-  }
-
-  // Validation helpers
-  validateItemCode(itemCode: string): boolean {
-    if (!itemCode) return false;
-    
-    // Check for duplicates
-    const duplicate = this.detailRows.find(row => 
-      row.item_code === itemCode && row !== this.getCurrentEditingRow()
-    );
-    
-    return !duplicate;
-  }
-
-  validateWarehouseLocation(location: string): boolean {
-    if (!location) return true; // Optional field
-    
-    // Check pattern A-01-02
-    const pattern = /^[A-Z]-[0-9]{2}-[0-9]{2}$/;
-    return pattern.test(location);
-  }
-
-  private getCurrentEditingRow(): any {
-    // Helper method to get currently editing row (if any)
-    // This would be used in more advanced editing scenarios
-    return null;
-  }
-
-  
-
-  
 }

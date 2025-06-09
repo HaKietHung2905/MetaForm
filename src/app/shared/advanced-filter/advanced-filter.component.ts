@@ -49,11 +49,11 @@ export interface FilterResult {
               <span class="filter-icon">🔍</span>
               Advanced Filters
             </h3>
-            <div class="filter-stats" *ngIf="showStats">
+            <!--<div class="filter-stats" *ngIf="showStats">
               <span class="stat-badge stat-total">{{ originalData.length }} total</span>
               <span class="stat-badge stat-filtered">{{ filteredData.length }} filtered</span>
               <span class="stat-badge stat-active">{{ getActiveFilterCount() }} active</span>
-            </div>
+            </div>-->
           </div>
           
           <div class="filter-actions">
@@ -92,7 +92,7 @@ export interface FilterResult {
             </button>
             
             <!-- Export Button (Optional) -->
-            <button 
+            <!--<button 
               *ngIf="showExport"
               type="button"
               class="btn-export"
@@ -100,7 +100,7 @@ export interface FilterResult {
               (click)="exportFilteredData()">
               <span class="btn-icon">📊</span>
               <span class="btn-text">Export</span>
-            </button>
+            </button>-->
           </div>
         </div>
       </div>
@@ -267,7 +267,7 @@ export interface FilterResult {
       </div>
 
       <!-- Filter Summary -->
-      <div *ngIf="hasValidFilters()" class="filter-summary">
+        <!--<div *ngIf="hasValidFilters()" class="filter-summary">
         <div class="filter-summary-content">
           <div class="filter-summary-info">
             <h4 class="filter-summary-title">
@@ -285,7 +285,7 @@ export interface FilterResult {
               {{ getFilterPercentage() }}% shown
             </div>
           </div>
-        </div>
+        </div>->
       </div>
 
       <!-- Apply/Auto-Apply Toggle -->
